@@ -24,9 +24,23 @@ namespace TestIMU
             port.DataReceived += new SerialDataReceivedEventHandler(port_DataReceived);
         }
 
+        System.Timers.Timer timer = new System.Timers.Timer(1000);
+        System.Diagnostics.Stopwatch watch = new System.Diagnostics.Stopwatch();
+
         public void Start()
         {
             port.Open();
+
+            timer.Elapsed += new System.Timers.ElapsedEventHandler(timer_Elapsed);
+            timer.Enabled = true;
+            watch.Start();
+        }
+
+        void timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            Console.WriteLine(count / (watch.ElapsedMilliseconds / 1000) + " fps");
+            watch.Restart();
+            count = 0;
         }
 
         public void Stop()
@@ -36,18 +50,22 @@ namespace TestIMU
 
         private void port_DataReceived(object sender, SerialDataReceivedEventArgs e)
         {
+            // Read data from serial port
             string data = port.ReadExisting();
+
+            // Append data to anything that may not have been completely read last reading
             bufferString += data;
 
-            //Console.WriteLine(bufferString);
-
+            // Split the string on the newline
             string[] split = bufferString.Split(new string[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
-            bufferString = "";
 
-            for (int i = 0; i < split.Length; i++)
+            // Process all of the lines we have, ignoring the last line because it might be incomplete, we'll process it next round.
+            for (int i = 0; i < split.Length - 1; i++)
             {
                 string line = split[i];
                 string[] split2 = line.Split(',');
+
+                count++;
 
                 if (split2.Length == 6)
                 {
@@ -60,22 +78,27 @@ namespace TestIMU
                         catch (Exception exception)
                         {
                             //One of the values of 6 could not be formatted into an int
-                            int a = 0;
-                            //Console.WriteLine(count++ + "\t" + line);
+                            Console.WriteLine("Parsing Error: " + line);
                         }
                     }
                 }
                 else
                 {
-                    //This line did not contain 6 entries
-                    if (i == (split.Length - 1))
-                    {
-                        // Adds the last line to the next buffer, since next data collection time will contain the rest of the data.
-                        // Does not take into consideration if the last entry is only '-'
-                        bufferString = line;
-                    }
+                    Console.WriteLine("Format Error: " + line);
                 }
             }
+
+            // If the last character is not a newline, then the last line has not been read complete so we ignore it this round
+            // and try again next reading.
+         //   if (bufferString.ToCharArray().Last() != '\n')
+         //   {
+        //        bufferString = split.Last();
+          //  }
+          //  else
+           // {
+                bufferString = "";
+           // }
+
         }
     }
 }

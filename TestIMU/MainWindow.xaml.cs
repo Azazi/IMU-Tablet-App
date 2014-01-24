@@ -62,7 +62,7 @@ namespace TestIMU
             double scaledYOrientation = scaleFactor * yOrientation;
             double scaledZOrientation = scaleFactor * zOrientation;
 
-            Console.WriteLine(scaledZOrientation + "");
+            //Console.WriteLine(scaledZOrientation + "");
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
