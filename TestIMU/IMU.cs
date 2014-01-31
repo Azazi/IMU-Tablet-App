@@ -7,7 +7,7 @@ using System.Threading;
 
 namespace TestIMU
 {
-    public class EMU
+    public class IMU
     {
         SerialPort port;
 
@@ -18,7 +18,7 @@ namespace TestIMU
         public delegate void DataRecieved(int accelX, int accelY, int accelZ, int gyroX, int gyroY, int gyroZ);
         public event DataRecieved OnDataRecieved;
 
-        public EMU()
+        public IMU()
         {
             port = new SerialPort("COM7", 115200, Parity.None, 8, StopBits.One);
             port.DataReceived += new SerialDataReceivedEventHandler(port_DataReceived);
@@ -38,7 +38,7 @@ namespace TestIMU
 
         void timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
-            Console.WriteLine(count / (watch.ElapsedMilliseconds / 1000) + " fps");
+            //Console.WriteLine(count / (watch.ElapsedMilliseconds / 1000) + " fps");
             watch.Restart();
             count = 0;
         }
@@ -59,46 +59,48 @@ namespace TestIMU
             // Split the string on the newline
             string[] split = bufferString.Split(new string[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
 
-            // Process all of the lines we have, ignoring the last line because it might be incomplete, we'll process it next round.
-            for (int i = 0; i < split.Length - 1; i++)
-            {
-                string line = split[i];
-                string[] split2 = line.Split(',');
-
-                count++;
-
-                if (split2.Length == 6)
-                {
-                    if (OnDataRecieved != null)
-                    {
-                        try
-                        {
-                            OnDataRecieved(Convert.ToInt32(split2[0]), Convert.ToInt32(split2[1]), Convert.ToInt32(split2[2]), Convert.ToInt32(split2[3]), Convert.ToInt32(split2[4]), Convert.ToInt32(split2[5]));
-                        }
-                        catch (Exception exception)
-                        {
-                            //One of the values of 6 could not be formatted into an int
-                            Console.WriteLine("Parsing Error: " + line);
-                        }
-                    }
-                }
-                else
-                {
-                    Console.WriteLine("Format Error: " + line);
-                }
-            }
-
             // If the last character is not a newline, then the last line has not been read complete so we ignore it this round
             // and try again next reading.
-         //   if (bufferString.ToCharArray().Last() != '\n')
-         //   {
-        //        bufferString = split.Last();
-          //  }
-          //  else
-           // {
-                bufferString = "";
-           // }
+            if (bufferString.ToCharArray().Last() != '\n')
+            {
+                bufferString = split.Last();
+            }
+            else
+            {
+                bufferString = split.Last() + "\n";
+            }
 
+            if (split.Length > 1)
+            {
+                // Process all of the lines we have, ignoring the last line because it might be incomplete, we'll process it next round.
+                for (int i = 0; i < split.Length - 1; i++)
+                {
+                    string line = split[i];
+                    string[] split2 = line.Split(',');
+
+                    if (split2.Length == 6)
+                    {
+
+                        if (OnDataRecieved != null)
+                        {
+                            try
+                            {
+                                OnDataRecieved(Convert.ToInt32(split2[0]), Convert.ToInt32(split2[1]), Convert.ToInt32(split2[2]), Convert.ToInt32(split2[3]), Convert.ToInt32(split2[4]), Convert.ToInt32(split2[5]));
+                                count++;
+                            }
+                            catch (Exception exception)
+                            {
+                                //One of the values of 6 could not be formatted into an int
+                                Console.WriteLine("Parsing Error: " + line);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("Format Error: " + line);
+                    }
+                }
+            }
         }
     }
 }

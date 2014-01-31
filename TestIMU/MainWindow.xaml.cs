@@ -20,7 +20,7 @@ namespace TestIMU
     /// </summary>
     public partial class MainWindow : Window
     {
-        EMU emu;
+        IMU imu;
 
         double previousXOrientation = 0;
         double previousYOrientation = 0;
@@ -33,21 +33,31 @@ namespace TestIMU
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            emu = new EMU();
-            emu.OnDataRecieved += new EMU.DataRecieved(emu_OnDataRecieved);
-            emu.Start();
+            imu = new IMU();
+            imu.OnDataRecieved += new IMU.DataRecieved(imu_OnDataRecieved);
+            imu.Start();
         }
 
-        void emu_OnDataRecieved(int accelX, int accelY, int accelZ, int gyroX, int gyroY, int gyroZ)
+        void imu_OnDataRecieved(int accelX, int accelY, int accelZ, int gyroX, int gyroY, int gyroZ)
         {
             double scaleFactor = 15.75467;
             double sensitivity = 0.0000875;
 
-            //double xrAngle;
-            //double yrAngle;
-            //double zrAngle;
+            double toDPS = 0.00875;
+            double minimumRateOfChange = 0.5;
 
-            //double r = Math.Sqrt(accelX * accelX + accelY * accelY + accelZ * accelZ);
+            double zOrientation = 0;
+
+            if (Math.Abs(gyroZ * toDPS) >= minimumRateOfChange)
+            {
+                double newGyroZ = gyroZ + 2.972420635;
+
+                zOrientation = (newGyroZ * sensitivity + previousZOrientation);
+                previousZOrientation = zOrientation;
+
+                double scaledZOrientation = scaleFactor * zOrientation;
+                Console.WriteLine(scaledZOrientation + "");
+            }
 
             double xOrientation = (gyroX * sensitivity + previousXOrientation);
             previousXOrientation = xOrientation;
@@ -55,19 +65,13 @@ namespace TestIMU
             double yOrientation = (gyroY * sensitivity + previousYOrientation);
             previousYOrientation = yOrientation;
 
-            double zOrientation = (gyroZ * sensitivity + previousZOrientation);
-            previousZOrientation = zOrientation;
-
             double scaledXOrientation = scaleFactor * xOrientation;
             double scaledYOrientation = scaleFactor * yOrientation;
-            double scaledZOrientation = scaleFactor * zOrientation;
-
-            //Console.WriteLine(scaledZOrientation + "");
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            emu.Stop();
+            imu.Stop();
         }
 
         private void Button_Click(object sender, RoutedEventArgs e)
