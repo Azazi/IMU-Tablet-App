@@ -20,7 +20,7 @@ namespace TestIMU
 
         public IMU()
         {
-            port = new SerialPort("COM7", 115200, Parity.None, 8, StopBits.One);
+            port = new SerialPort("COM5", 115200, Parity.None, 8, StopBits.One);
             port.DataReceived += new SerialDataReceivedEventHandler(port_DataReceived);
         }
 
@@ -91,7 +91,8 @@ namespace TestIMU
                             catch (Exception exception)
                             {
                                 //One of the values of 6 could not be formatted into an int
-                                Console.WriteLine("Parsing Error: " + line);
+                                Console.WriteLine("Error Parsing line: " + line);
+                                Console.WriteLine("Error Message: " + exception.Message);
                             }
                         }
                     }
