@@ -22,9 +22,30 @@ namespace TestIMU
     {
         IMU imu;
 
-        double previousXOrientation = 0;
-        double previousYOrientation = 0;
-        double previousZOrientation = 0;
+        const double SCALE_FACTOR = 15.75467;
+        const double RAW_FACTOR = 2.972420635;
+        const double TO_DEGREES = 0.0000875;
+        const double TO_DPS = 0.00875;
+        const double MINIMUM_GYRO_RATE_OF_CHANGE = 0.5;
+        const int MINIMUM_ACCEL_RATE_OF_CHANGE = 139;
+        const int TO_360 = 360;
+
+        double rawTiltAngle = 0;
+        double unscaledRawTiltAngle = 0;
+
+        object positionLock = new object();
+        object tiltLock = new object();
+        object orientationLock = new object();
+
+        Point currentPosition = new Point(0, 0);
+        double tiltAngle = 0;
+        double orientaion = 0;
+
+        double previousAcceleration = 0;
+        double previousVelocity = 0;
+        double unscaledOrientation = 0;
+
+        string output = "";
 
         public MainWindow()
         {
@@ -40,65 +61,68 @@ namespace TestIMU
 
         void imu_OnDataRecieved(int accelX, int accelY, int accelZ, int gyroX, int gyroY, int gyroZ)
         {
-            double R = Math.Sqrt(Math.Pow(accelX, 2) + Math.Pow(accelY, 2) + Math.Pow(accelZ, 2));
-            double XR = Math.Acos(accelX / R) * 180 / Math.PI;
-            double YR = Math.Acos(accelY / R) * 180 / Math.PI;
-            double ZR = Math.Acos(accelZ / R) * 180 / Math.PI;
-
-            double scaleFactor = 15.75467;
-            double sensitivity = 0.0000875;
-
-            double toDPS = 0.00875;
-            double minimumRateOfChange = 0.5;
-
-            double zOrientation = 0;
-            double yOrientation = 0;
-
-            if (Math.Abs(gyroZ * toDPS) >= minimumRateOfChange)
+            /// Computes the position of the device in the 2D space using the accelerometer. I account
+            /// here for the noise of the signal, and accumelatively compute the displacement using the
+            /// accelY measurements.
+            if (accelY > MINIMUM_ACCEL_RATE_OF_CHANGE)
             {
-                double newGyroZ = gyroZ + 2.972420635;
+                lock (positionLock)
+                {
+                    double currentAcceleration = accelY;
+                    double currentVelocity = (previousAcceleration + currentAcceleration) * (0.05);
+                    double distance = (previousVelocity + currentVelocity) * (0.05);
 
-                zOrientation = (newGyroZ * sensitivity + previousZOrientation);
-                previousZOrientation = zOrientation;
-
-                double scaledZOrientation = scaleFactor * zOrientation;
-                Console.WriteLine(scaledZOrientation + "");
+                    currentPosition.X = currentPosition.X + (distance * Math.Cos(orientaion * Math.PI / 180));
+                    currentPosition.Y = currentPosition.Y + (distance * Math.Sin(orientaion * Math.PI / 180));
+                }
             }
 
+            /// Compute the acceleration vector and the angle it makes with the X-axis to be used 
+            /// later to find the tilt angle.
+            double R = Math.Sqrt(Math.Pow(accelX, 2) + Math.Pow(accelY, 2) + Math.Pow(accelZ, 2));
+            double XR = Math.Acos(accelX / R) * 180 / Math.PI;
+
+            /// Calculates the horizontal orientation of the device by using
+            /// the gyroscope readings of the Z-axis. I account here for the
+            /// Random Angle Walk factor -refer to paper details.
+            if (Math.Abs(gyroZ * TO_DPS) >= MINIMUM_GYRO_RATE_OF_CHANGE)
+            {
+                lock (orientationLock)
+                {
+                    double newGyroZ = gyroZ + RAW_FACTOR;
+                    unscaledOrientation = (newGyroZ * TO_DEGREES + unscaledOrientation);
+                    if (unscaledOrientation < 0) { orientaion = (SCALE_FACTOR * unscaledOrientation) + TO_360; }
+                    else { orientaion = (SCALE_FACTOR * unscaledOrientation); }
+                    orientaion = orientaion % TO_360;
+                }
+            }
 
             /// I am just including this for comparison purposes, the acutal 
             /// yOrientaion aka the tilt angle will be computed using the Kalman
-            /// filter as in below.
-            if (Math.Abs(gyroY * toDPS) >= minimumRateOfChange)
+            /// filter as in below. Could be used to conduct comparison of filtered
+            /// vs. raw tilt angle.
+            if (Math.Abs(gyroY * TO_DPS) >= MINIMUM_GYRO_RATE_OF_CHANGE)
             {
-                double newGyroY = gyroY + 2.972420635;
-
-                yOrientation = (newGyroY * sensitivity + previousZOrientation);
-                previousYOrientation = yOrientation;
-
-                double scaledYOrientation = scaleFactor * yOrientation;
-                Console.WriteLine(scaledYOrientation + "");
+                double newGyroY = gyroY + RAW_FACTOR;
+                unscaledRawTiltAngle = (newGyroY * TO_DEGREES + unscaledRawTiltAngle);
+                if (unscaledRawTiltAngle < 0) { rawTiltAngle = (SCALE_FACTOR * unscaledRawTiltAngle) + TO_360; }
+                else { rawTiltAngle = (SCALE_FACTOR * unscaledRawTiltAngle); }
+                rawTiltAngle = rawTiltAngle % TO_360;
             }
 
             /// This line calculates the tilt angle by passing the gyro rate of
             /// change and the angle returned by the accelerometer to the Kalman
-            /// filter, producing a refined tilt (yOrientaion) angle
-            double tiltAngle = KalmanFilter.getAngle(XR - 90, gyroY, 0.01);
+            /// filter, producing a refined tilt (yOrientaion) angle.
+            lock (tiltLock)
+            {
+                tiltAngle = KalmanFilter.getAngle(XR - 90, gyroY, 0.01);
+            }
 
-            /// Displaying a rounded tilt angle as the content of the reset button
-            /// as it provides a more readable measure than monitoring long lines of
-            /// digits on the console
+            /// Logging
             this.Dispatcher.Invoke(new Action(delegate()
             {
-                resetButton.Content = Math.Round(tiltAngle, 2);
+                statusLabel.Content = "Location: (" + Math.Round(currentPosition.X, 2) + ", " + Math.Round(currentPosition.Y, 2) + ")\tTilt: " + tiltAngle + "\tOrientation: " + orientaion;
             }));
-
-            /// The next three lines are not needed as we are not considering
-            /// the xOrientation for our case study
-            double xOrientation = (gyroX * sensitivity + previousXOrientation);
-            previousXOrientation = xOrientation;
-            double scaledXOrientation = scaleFactor * xOrientation;
-
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
@@ -106,11 +130,39 @@ namespace TestIMU
             imu.Stop();
         }
 
-        private void Button_Click(object sender, RoutedEventArgs e)
+        private void resetButton_Click(object sender, RoutedEventArgs e)
         {
-            previousXOrientation = 0;
-            previousYOrientation = 0;
-            previousZOrientation = 0;
+            rawTiltAngle = 0;
+            unscaledRawTiltAngle = 0;
+
+            currentPosition = new Point(0, 0);
+            tiltAngle = 0;
+            orientaion = 0;
+
+            previousAcceleration = 0;
+            previousVelocity = 0;
+            unscaledOrientation = 0;          
+        }
+
+        private void Window_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Escape)
+            {
+                imu.Stop();
+                Application.Current.Shutdown();
+            }
+        }
+
+        private void saveButton_Click(object sender, RoutedEventArgs e)
+        {
+            System.IO.StreamWriter file = new System.IO.StreamWriter(nameTextBox.Text + "_results.txt");
+            file.WriteLine(output);
+            file.Close();
+        }
+
+        private void sendButton_Click(object sender, RoutedEventArgs e)
+        {
+            output += "Location: (" + Math.Round(currentPosition.X, 2) + ", " + Math.Round(currentPosition.Y, 2) + ")\tTilt: " + Math.Round(tiltAngle,2) + "\tOrientation: " + Math.Round(orientaion,2) + "\r\n";
         }
     }
 }
