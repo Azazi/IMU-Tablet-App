@@ -122,6 +122,8 @@ namespace TestIMU
             this.Dispatcher.Invoke(new Action(delegate()
             {
                 statusLabel.Content = "Location: (" + Math.Round(currentPosition.X, 2) + ", " + Math.Round(currentPosition.Y, 2) + ")\tTilt: " + tiltAngle + "\tOrientation: " + orientaion;
+                Point bla = Util.getIntersection(new Point(0, 0), 0, 0);
+                Console.WriteLine("(" + bla.X + "," + bla.Y + ")");
             }));
         }
 
