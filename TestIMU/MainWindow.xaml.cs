@@ -206,7 +206,8 @@ namespace TestIMU
 
         private void sendButton_Click(object sender, RoutedEventArgs e)
         {
-            output += "Location: (" + Math.Round(currentPosition.X, 2) + ", " + Math.Round(currentPosition.Y, 2) + ")\tTilt: " + Math.Round(tiltAngle,2) + "\tOrientation: " + Math.Round(orientaion,2) + "\r\n";
+            Point intersection = Util.getIntersection(new Point(0, 0), tiltAngle, orientaion);
+            output += "Location: (" + Math.Round(currentPosition.X, 2) + ", " + Math.Round(currentPosition.Y, 2) + ")\tTilt: " + Math.Round(tiltAngle,2) + "\tOrientation: " + Math.Round(orientaion,2) + "\tIntersection: (" + intersection.X + ", "+ intersection.Y + ")\r\n";
         }
     }
 }

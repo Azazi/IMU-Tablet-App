@@ -20,7 +20,7 @@ namespace TestIMU
 
         public IMU()
         {
-            port = new SerialPort("COM3", 115200, Parity.None, 8, StopBits.One);
+            port = new SerialPort("COM5", 115200, Parity.None, 8, StopBits.One);
             port.DataReceived += new SerialDataReceivedEventHandler(port_DataReceived);
         }
 
