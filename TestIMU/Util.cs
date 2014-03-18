@@ -10,21 +10,25 @@ namespace TestIMU
     {
         private const double HEIGHT = 66;
         private const double DISTANCE_FROM_DISPLAY = 150;
-        public static Point getIntersection(Point location, double tiltAngle, double orientation)
+        public static Point getIntersection(Point location, double tiltAngle, double orientation)                                                                                                                                                         
         {
             Point returnPoint = new Point();
 
             //Get X-Y Line
             double m_1 = Math.Tan(orientation*Math.PI/180);
+            Console.WriteLine("m_1: " + m_1);
             double n_1 = location.Y - (m_1 * location.X);
 
             // Get X-Z Line
             double m_2 = Math.Tan(tiltAngle * Math.PI / 180);
-            double n_2 = HEIGHT - (m_2 * location.X);
+            Console.WriteLine("m_2: " + m_2 + "tilt: " + tiltAngle);
+            //double n_2 = HEIGHT - (m_2 * location.X);
+            double n_2 = location.Y - (m_2 * HEIGHT);
 
             // Get intersection point
             double x = (DISTANCE_FROM_DISPLAY - n_1) / m_1;
-            double z = (m_2 * x) + n_2;
+            //double z = (m_2 * x) + n_2;
+            double z = (DISTANCE_FROM_DISPLAY - n_2) / m_2;
 
             if(x<=71.585 && x>=-71.585 && z>=39.95 && z<=119.85)
             {

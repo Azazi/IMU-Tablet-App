@@ -13,6 +13,8 @@ using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.IO.Ports;
 
+using IntAirAct;
+
 namespace TestIMU
 {
     /// <summary>
@@ -20,6 +22,11 @@ namespace TestIMU
     /// </summary>
     public partial class MainWindow : Window
     {
+        IAIntAirAct intAirAct;
+        IARoute sendRoute = IARoute.Post("/location");
+        int sendCounter = 0;
+        object counterLock = new object();
+
         IMU imu;
 
         const double SCALE_FACTOR = 15.75467;
@@ -54,6 +61,17 @@ namespace TestIMU
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            intAirAct = IAIntAirAct.New();
+
+            try
+            {
+                intAirAct.Start();
+            }
+            catch (Exception exception)
+            {
+                MessageBox.Show(exception.Message);
+            }
+
             imu = new IMU();
             imu.OnDataRecieved += new IMU.DataRecieved(imu_OnDataRecieved);
             imu.Start();
@@ -115,16 +133,40 @@ namespace TestIMU
             /// filter, producing a refined tilt (yOrientaion) angle.
             lock (tiltLock)
             {
-                tiltAngle = KalmanFilter.getAngle(XR - 90, gyroY, 0.01);
+                tiltAngle = 90 + KalmanFilter.getAngle(XR - 90, gyroY, 0.01);                
             }
 
             /// Logging
             this.Dispatcher.Invoke(new Action(delegate()
             {
                 statusLabel.Content = "Location: (" + Math.Round(currentPosition.X, 2) + ", " + Math.Round(currentPosition.Y, 2) + ")\tTilt: " + tiltAngle + "\tOrientation: " + orientaion;
-                Point bla = Util.getIntersection(new Point(0, 0), 0, 0);
-                Console.WriteLine("(" + bla.X + "," + bla.Y + ")");
             }));
+
+            lock (counterLock)
+            {
+                sendCounter++;
+
+                if (sendCounter > 10)
+                {
+                    Point bla = Util.getIntersection(new Point(0, 0), tiltAngle, orientaion);
+                    Console.WriteLine("(" + bla.X + "," + bla.Y + ")");
+                    IEnumerable<IADevice> devices = this.intAirAct.Devices;
+
+                    Dictionary<string, string> dictionary = new Dictionary<string, string>();
+                    dictionary.Add("x", bla.X.ToString());
+                    dictionary.Add("y", bla.Y.ToString());
+
+                    IARequest request = new IARequest(sendRoute);
+                    request.SetBodyWith(dictionary);
+                    request.Origin = this.intAirAct.OwnDevice;
+
+                    foreach (IADevice device in devices)
+                    {
+                        this.intAirAct.SendRequest(request, device);
+                    }
+                    sendCounter = 0;
+                }
+            }
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
